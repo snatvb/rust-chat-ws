@@ -1,78 +1,61 @@
 extern crate tokio;
-extern crate websocket;
 
+use futures::future::poll_fn;
 use rand::Rng;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use websocket::server::upgrade::WsUpgrade;
-use websocket::sync::Server;
-use websocket::OwnedMessage;
+use std::{env, io::Error};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_tungstenite::WebSocketStream;
 
-const WORKERS: usize = 4;
+async fn accept_connection(stream: TcpStream) {
+    let addr = stream
+        .peer_addr()
+        .expect("connected streams should have a peer address");
+    println!("Peer address: {}", addr);
 
-type Request = WsUpgrade<std::net::TcpStream, Option<websocket::server::upgrade::sync::Buffer>>;
-
-struct SharedState {
-    sender: websocket::sender::Writer<std::net::TcpStream>,
-}
-
-fn handle_request(request: Request) {
-    let protocol_name = "rust-websocket";
-    if !request.protocols().contains(&protocol_name.to_string()) {
-        println!("Rejected");
-        request.reject().unwrap();
-        return;
+    for i in (0..9999999) {
+      let x = (i as i64).wrapping_mul(i);
+      println!("{}", x);
     }
+    let ws_stream: WebSocketStream<TcpStream> = tokio_tungstenite::accept_async(stream)
+        .await
+        .expect("Error during the websocket handshake occurred");
 
-    let client = request.use_protocol(protocol_name).accept().unwrap();
-    let ip = client.peer_addr().unwrap();
-    println!("Connection from {}", ip);
+    println!("New WebSocket connection: {}", addr);
 
-    let (mut receiver, sender) = client.split().unwrap();
-    let shared_state = Arc::new(Mutex::new(SharedState { sender }));
+    // let stream = ws_stream.poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>);
+    // let mut buf = [0; 10];
 
-    for message in receiver.incoming_messages() {
-        let shared_state_thread = shared_state.clone();
-        rayon::spawn(move || {
-            let mut rng = rand::thread_rng();
-            let sleep_duration = rng.gen_range(0, 50);
-            println!("Sleep: {}", sleep_duration);
-            thread::sleep_ms(sleep_duration);
-            let mut shared_state = shared_state_thread.lock().unwrap();
-            let message = message.unwrap();
-            match message {
-                OwnedMessage::Close(_) => {
-                    let message = OwnedMessage::Close(None);
-                    shared_state.sender.send_message(&message).unwrap();
-                    println!("Client {} disconnected", ip);
-                    return;
-                }
-                OwnedMessage::Ping(ping) => {
-                    let message = OwnedMessage::Pong(ping);
-                    shared_state.sender.send_message(&message).unwrap();
-                }
-                _ => {
-                    shared_state.sender.send_message(&message).unwrap()
-                }
-            }
-        });
-    }
+    // poll_fn(|cx| {
+    //     stream.poll_peek(cx, &mut buf)
+    // }).await.unwrap();
+    // let msg = ws_stream.inner.read_message().unwrap();
+
+    // read.forward(write)
+    //     .await
+    //     .expect("Failed to forward message")
 }
 
 async fn run_server() {
-    let server = Server::bind("127.0.0.1:8089").unwrap();
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(WORKERS)
-        .build()
-        .unwrap();
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:8089".to_string());
 
-    pool.install(|| {
-        for request in server.filter_map(Result::ok) {
-            rayon::spawn(move || {
-                handle_request(request);
-            });
-        }
-    });
+    // Create the event loop and TCP listener we'll accept connections on.
+    let try_socket = TcpListener::bind(&addr).await;
+    let mut listener = try_socket.expect("Failed to bind");
+    println!("Listening on: {}", addr);
+
+    while let Ok((stream, _)) = listener.accept().await {
+        tokio::spawn(async || {
+          for i in 0..999999 {
+            let x = (i as i64).wrapping_mul(i);
+            println!("{}", x);
+          }
+        });
+        // tokio::spawn(accept_connection(stream));
+    }
 }
 
 #[tokio::main]
@@ -81,3 +64,8 @@ async fn main() {
     let server = run_server();
     server.await;
 }
+
+// let mut rng = rand::thread_rng();
+// let sleep_duration = rng.gen_range(0, 50);
+// println!("Sleep: {}", sleep_duration);
+// thread::sleep_ms(sleep_duration);
