@@ -33,46 +33,40 @@ fn handle_request(request: Request) {
 
     for message in receiver.incoming_messages() {
         let shared_state_thread = shared_state.clone();
-        rayon::spawn(move || {
-            let mut rng = rand::thread_rng();
-            let sleep_duration = rng.gen_range(0, 50);
-            println!("Sleep: {}", sleep_duration);
-            thread::sleep_ms(sleep_duration);
-            let mut shared_state = shared_state_thread.lock().unwrap();
-            let message = message.unwrap();
-            match message {
-                OwnedMessage::Close(_) => {
-                    let message = OwnedMessage::Close(None);
-                    shared_state.sender.send_message(&message).unwrap();
-                    println!("Client {} disconnected", ip);
-                    return;
-                }
-                OwnedMessage::Ping(ping) => {
-                    let message = OwnedMessage::Pong(ping);
-                    shared_state.sender.send_message(&message).unwrap();
-                }
-                _ => {
-                    shared_state.sender.send_message(&message).unwrap()
-                }
+        let mut rng = rand::thread_rng();
+        let sleep_duration = rng.gen_range(0, 50);
+        println!("Sleep: {}", sleep_duration);
+        thread::sleep_ms(sleep_duration);
+        let mut shared_state = shared_state_thread.lock().unwrap();
+        let message = message.unwrap();
+        match message {
+            OwnedMessage::Close(_) => {
+                let message = OwnedMessage::Close(None);
+                shared_state.sender.send_message(&message).unwrap();
+                println!("Client {} disconnected", ip);
+                return;
             }
-        });
+            OwnedMessage::Ping(ping) => {
+                let message = OwnedMessage::Pong(ping);
+                shared_state.sender.send_message(&message).unwrap();
+            }
+            _ => shared_state.sender.send_message(&message).unwrap(),
+        }
     }
 }
 
 async fn run_server() {
     let server = Server::bind("127.0.0.1:8089").unwrap();
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(WORKERS)
-        .build()
-        .unwrap();
+    // let pool = rayon::ThreadPoolBuilder::new()
+    //     .num_threads(WORKERS)
+    //     .build()
+    //     .unwrap();
 
-    pool.install(|| {
-        for request in server.filter_map(Result::ok) {
-            rayon::spawn(move || {
-                handle_request(request);
-            });
-        }
-    });
+    for request in server.filter_map(Result::ok) {
+        tokio::spawn(async move {
+            handle_request(request);
+        });
+    }
 }
 
 #[tokio::main]
