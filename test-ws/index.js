@@ -1,5 +1,6 @@
 const WebSocket = require('ws')
 const process = require('process')
+const { uCode } = require('./helpers/uCode')
 
 const stressTest = () => {
   let count = 0;
@@ -27,11 +28,19 @@ const chat = () => {
 
     ws.on('open', () => {
       console.log('open')
+      // ws.send(JSON.stringify({
+      //   type: 'message',
+      //   payload: {
+      //     receiver_id: 1,
+      //     text: 'Hello my friend!',
+      //   },
+      // }))
       ws.send(JSON.stringify({
-        type: 'message',
+        type: 'Register',
         payload: {
-          receiver_id: 1,
-          text: 'Hello my friend!',
+          name: uCode(),
+          nickname: uCode(),
+          password: '111111',
         },
       }))
       console.log('sended')

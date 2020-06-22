@@ -1,5 +1,5 @@
 [package]
-name = "cut-cli"
+name = "chat"
 version = "0.1.0"
 authors = ["Andrew Brigthon <snatvb@ya.ru>"]
 edition = "2018"

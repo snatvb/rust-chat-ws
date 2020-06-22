@@ -1,7 +1,9 @@
+pub mod requests;
+pub mod responses;
+
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Message;
 
-pub mod types;
 
 #[derive(PartialEq, Clone)]
 pub struct Error {
@@ -9,27 +11,35 @@ pub struct Error {
 }
 
 pub enum Msg {
-  UserMsg(types::UserMsg),
+  AuthRegister(requests::auth::Register),
+  UserMsg(requests::UserMsg),
   Unexpected(Error),
 }
 
+#[inline(always)]
 fn error(string: &str) -> Error {
   Error {
     message: string.to_string(),
   }
 }
 
+#[inline]
 fn parse_usr_message(json_payload: Value) -> Msg {
-  let user_msg: Option<types::UserMsg> = serde_json::from_value(json_payload).ok();
-  match user_msg.map(Msg::UserMsg) {
-    Some(x) => x,
-    None => Msg::Unexpected(error("Message parse was failed")),
-  }
+  let parsed: Option<requests::UserMsg> = serde_json::from_value(json_payload).ok();
+  parsed.map(Msg::UserMsg).unwrap_or(Msg::Unexpected(error("Message parse was failed")))
 }
 
+#[inline]
+fn parse_register(json_payload: Value) -> Msg {
+  let parsed: Option<requests::auth::Register> = serde_json::from_value(json_payload).ok();
+  parsed.map(Msg::AuthRegister).unwrap_or(Msg::Unexpected(error("Register payload parse was failed")))
+}
+
+#[inline]
 fn parse_payload(action_type: &str, json_payload: Value) -> Msg {
   match action_type {
-    "message" => parse_usr_message(json_payload),
+    "Message" => parse_usr_message(json_payload),
+    "Register" => parse_register(json_payload),
     _ => Msg::Unexpected(error(&format!("Unexpected action type {}", "action_type"))),
   }
 }

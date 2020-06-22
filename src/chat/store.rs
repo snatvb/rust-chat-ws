@@ -1,29 +1,47 @@
-mod user;
+pub mod dialogs;
+pub mod selectors;
+pub mod users;
 
-use futures::channel::mpsc::{UnboundedSender};
-use std::{net::SocketAddr};
-use tokio_tungstenite::tungstenite::Message;
 use crate::id_record::IDRecord;
-pub use user::User;
+pub use dialogs::{Dialog, Dialogs};
+use futures::channel::mpsc::UnboundedSender;
+use std::net::SocketAddr;
+use tokio_tungstenite::tungstenite::Message;
+pub use users::{User, Users};
 
 pub type Tx = UnboundedSender<Message>;
 
+#[derive(Clone)]
 pub struct PeerItem {
-  pub socket_addr: SocketAddr,
-  pub tx: Tx,
-  pub user: Option<User>,
+    pub tx: Tx,
+    pub socket_addr: SocketAddr,
+    pub user_id: Option<users::Id>,
 }
 
-pub type Peers = IDRecord<u32, PeerItem>;
+impl PeerItem {
+    pub fn new(socket_addr: SocketAddr, tx: Tx) -> Self {
+        PeerItem {
+            tx,
+            socket_addr,
+            user_id: None,
+        }
+    }
+}
+
+pub type Peers = IDRecord<PeerItem>;
 
 pub struct Store {
+    pub users: Users,
     pub peers: Peers,
+    pub dialogs: Dialogs,
 }
 
 impl Store {
     pub fn new() -> Self {
         Store {
+            users: Users::new(),
             peers: Peers::new(),
+            dialogs: Dialogs::new(),
         }
     }
 }
