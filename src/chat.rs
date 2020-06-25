@@ -7,7 +7,7 @@ use futures::channel::mpsc::unbounded;
 use futures_util::{future, stream::TryStreamExt, StreamExt};
 use messages::{
     requests, responses,
-    Msg::{AuthRegister, Unexpected, UserMsg},
+    Msg::{AuthRegister, CreateDialog, Unexpected, UserMsg},
 };
 use serde_json::{json, Value};
 use std::{
@@ -82,6 +82,11 @@ fn handle_usr_msg(store: &Store, msg: &requests::UserMsg, sender_peer: &PeerItem
             response(sender_peer, &response_msg);
         }
         None => {
+            let error_msg = format!("Cannot find user with id: {}", msg.receiver_id);
+            response(
+                sender_peer,
+                &json!(messages::responses::error::not_found(&error_msg)),
+            );
             println!(
                 "[TODO: RESPONSE] User was not authorize {}",
                 msg.receiver_id
@@ -98,7 +103,6 @@ fn handle_register(store: SharedStore, msg: &requests::auth::Register, sender_pe
         msg.password.clone(),
     );
 
-    println!("asd {}", usr.is_err());
     match usr {
         Ok(user) => {
             let packet = responses::Packet {
@@ -112,6 +116,38 @@ fn handle_register(store: SharedStore, msg: &requests::auth::Register, sender_pe
 }
 
 #[inline]
+fn xxx(store: SharedStore, user: &User, sender_peer: &PeerItem) {
+    match store.clone().lock().unwrap().dialogs.create_direct(user.id) {
+        Ok(dialog) => {
+            let created = responses::CreatedDialog { dialog };
+            let payload = responses::Payload::CreatedDialog(created);
+            let packet = responses::Packet {
+                action_type: responses::ActionType::Registered,
+                payload: payload.clone(),
+            };
+            response(sender_peer, &serde_json::to_value(packet).unwrap());
+        }
+        Err(_) => response_error(
+            sender_peer,
+            responses::error::bad_request("Can't create dialog... :("),
+        ),
+    }
+}
+
+#[inline]
+fn handle_create_dialog(store: SharedStore, msg: &requests::CreateDialog, sender_peer: &PeerItem) {
+    let usr = store.lock().unwrap().users.get_by_nick(&msg.nickname);
+
+    match usr {
+        Some(user) => xxx(store.clone(), &user, sender_peer),
+        None => response_error(
+            sender_peer,
+            responses::error::bad_request("Can't find user with such nickname"),
+        ),
+    }
+}
+
+#[inline]
 fn handle_parse_msg(store: SharedStore, message: &Message, sender_peer: &PeerItem) {
     let parsed_msg = messages::parse(message);
     match parsed_msg {
@@ -121,6 +157,9 @@ fn handle_parse_msg(store: SharedStore, message: &Message, sender_peer: &PeerIte
                 handle_usr_msg(store, &msg, &sender_peer, sender)
             })
         }
+        CreateDialog(msg) => with_auth(&store.lock().unwrap(), sender_peer, |_| {
+            handle_create_dialog(store.clone(), &msg, &sender_peer)
+        }),
         AuthRegister(payload) => handle_register(store.clone(), &payload, &sender_peer),
         Unexpected(error) => {
             println!("Invalid message: {}", error.message);

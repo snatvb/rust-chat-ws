@@ -11,6 +11,7 @@ pub struct Error {
 }
 
 pub enum Msg {
+  CreateDialog(requests::CreateDialog),
   AuthRegister(requests::auth::Register),
   UserMsg(requests::UserMsg),
   Unexpected(Error),
@@ -36,10 +37,17 @@ fn parse_register(json_payload: Value) -> Msg {
 }
 
 #[inline]
+fn parse_create_dialog(json_payload: Value) -> Msg {
+  let parsed: Option<requests::CreateDialog> = serde_json::from_value(json_payload).ok();
+  parsed.map(Msg::CreateDialog).unwrap_or(Msg::Unexpected(error("Register payload parse was failed")))
+}
+
+#[inline]
 fn parse_payload(action_type: &str, json_payload: Value) -> Msg {
   match action_type {
     "Message" => parse_usr_message(json_payload),
     "Register" => parse_register(json_payload),
+    "CreateDialog" => parse_create_dialog(json_payload),
     _ => Msg::Unexpected(error(&format!("Unexpected action type {}", "action_type"))),
   }
 }

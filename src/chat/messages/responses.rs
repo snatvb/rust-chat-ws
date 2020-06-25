@@ -1,14 +1,19 @@
+pub mod created_dialog;
 pub mod registered;
 pub mod error;
 pub mod ok;
 
 use serde::{Serialize, Deserialize};
+pub use created_dialog::*;
+
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Payload {
   OK(ok::OK),
   Error(error::Error),
   Registered(registered::Registered),
+  CreatedDialog(created_dialog::CreatedDialog),
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

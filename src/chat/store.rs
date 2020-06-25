@@ -1,6 +1,7 @@
 pub mod dialogs;
 pub mod selectors;
 pub mod users;
+pub mod error;
 
 use crate::id_record::IDRecord;
 pub use dialogs::{Dialog, Dialogs};

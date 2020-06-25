@@ -2,18 +2,10 @@ use crate::id_record;
 use id_record::IDCounter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use super::error::Error;
 
 pub type Id = id_record::KeyType;
 
-pub struct Error {
-    pub message: String,
-}
-
-impl Error {
-    pub fn new(message: String) -> Self {
-        Error { message }
-    }
-}
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -65,16 +57,12 @@ impl Users {
         self.users.get(user_id)
     }
 
-    pub fn get_by_nick(&self, nickname: &str) -> Option<&User> {
+    pub fn get_by_nick(&self, nickname: &str) -> Option<User> {
         for (_, user) in self.users.iter() {
             if user.nickname == nickname {
-                return Some(user);
+                return Some(user.clone());
             }
         }
         return None;
-    }
-
-    pub fn a(&self) -> i32 {
-      1
     }
 }
